@@ -2,7 +2,7 @@
 
 namespace gitprogressive {
 
-// TODO(T7.1): real flag parsing (--branch-name, --provider, --dry-run).
+// TODO(T8.1): real flag parsing (--branch-name, --provider, --dry-run).
 Args parseArgs(int argc, char** argv) {
     Args args;
     if (argc < 2) {

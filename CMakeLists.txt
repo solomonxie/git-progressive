@@ -9,6 +9,7 @@ add_executable(git-progressive
     src/cli/args.cpp
     src/git/repo.cpp
     src/diff/parser.cpp
+    src/agent/loop.cpp
     src/planner/planner.cpp
     src/commit/builder.cpp
 )
