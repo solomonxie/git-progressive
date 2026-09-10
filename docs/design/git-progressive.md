@@ -62,6 +62,39 @@ uses the LLM only for the part it's actually good at: judging what's core
 vs. peripheral and choosing a teaching order. This bounds the blast radius
 of LLM mistakes to "bad ordering," never "corrupted code."
 
+## Planner: single-shot vs agent loop
+
+- **Single-shot prompt**: hunk summaries in one prompt → JSON plan out.
+  Cheap, one request. But the model can only reason from hunk text/
+  summaries — no way to pull in surrounding file context, related
+  symbols, or original commit messages when judging "core vs side
+  effect" — and an invalid plan needs a separate retry driver bolted on
+  from outside the model's own reasoning.
+- **Tool-calling agent loop** (chosen): the model drives a loop with
+  tools — enumerate hunks, read a hunk's full diff, read surrounding
+  file content, read original commit messages, and finally `submit_plan`.
+  `submit_plan` runs local validation (full hunk coverage, dependency
+  order) and returns errors as the tool result, so the model self-
+  corrects inside the same loop rather than an external retry harness.
+  More requests/cost, but this is what "LLM agents" in the original ask
+  means: an agent that explores before committing to an answer, not one
+  blind guess.
+
+## Architecture
+
+- `git` — resolves ranges, diffs, branch creation (shells out to `git`).
+- `diff` — parses unified diff into hunks, detects same-file hunk
+  dependencies.
+- `llm` — provider clients (OpenAI, Claude) speaking each API's
+  tool-calling protocol.
+- `agent` — generic tool-calling loop: send messages+tools, dispatch
+  tool calls, append results, repeat until a terminal call or iteration
+  cap. Not planner-specific, so any future agent can reuse it.
+- `planner` — the progressive-planning agent: system prompt + its tool
+  set (list/read hunks, read file, read commit messages, submit plan
+  with validation).
+- `commit` — applies a validated plan's phases as real commits.
+
 ## Risks / open questions
 
 - **Hunk interdependency**: two hunks in the same file can conflict if
@@ -76,6 +109,9 @@ of LLM mistakes to "bad ordering," never "corrupted code."
   Acceptable for a review aid, but worth noting for users expecting
   reproducibility.
 - **Compilability per commit**: not guaranteed in v1 (see non-goals).
+- **Agent loop cost/latency**: multi-turn tool use is slower and pricier
+  than one prompt; needs an iteration cap and should degrade to "best
+  plan so far" rather than looping indefinitely on a stubborn model.
 
 ## Backlog
 

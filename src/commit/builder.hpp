@@ -7,7 +7,7 @@
 
 namespace gitprogressive {
 
-// Applies a validated plan's phases as sequential commits (T6.1, T6.2).
+// Applies a validated plan's phases as sequential commits (T7.1, T7.2).
 void buildCommits(const Plan& plan, const Repository& repo, const std::string& branch);
 
 } // namespace gitprogressive
