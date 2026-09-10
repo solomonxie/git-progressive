@@ -5,7 +5,11 @@
 Reviewing a large PR or an unfamiliar branch/repo as one flat diff dumps
 every change at once — core logic, side effects, and unrelated cleanup
 mixed together — with no reading order. Reviewers get flooded instead of
-walked through a thought process.
+walked through a thought process. AI-assisted coding makes this worse:
+agents now produce far larger diffs, far faster, than humans used to —
+so the code a person has to *read and trust* increasingly outpaces the
+code they wrote. This tool is a human-in-the-loop aid for that: use the
+LLM to restructure the change for reading, not to write or judge it.
 
 ## Goals
 
@@ -75,5 +79,9 @@ of LLM mistakes to "bad ordering," never "corrupted code."
 
 ## Backlog
 
-- Visualize the progressive phases (e.g. rendered step-by-step diff view)
-  so a human can walk through phases without checking out each commit.
+- Visualization of the progressive phases: the CLI/branch output is the
+  substrate, not the only front end. Once phases exist as structured data
+  (not just commits), multiple presentations become possible — a
+  step-by-step terminal walkthrough, a web diff viewer, an IDE plugin,
+  a static HTML report for a PR. Not designed yet; v1 only needs the
+  phases to exist as real, ordered commits.
