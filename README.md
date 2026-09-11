@@ -75,12 +75,13 @@ export ANTHROPIC_API_KEY=...
 ./build/git-progressive feature-branch --provider claude --model claude-sonnet-5
 ```
 
-Every run is auditable: it prints the outline/plan/log file paths for
-that run before doing anything else (default under `/tmp`,
-override with `--audit-dir DIR`). `outline.md` and `plan.md` are
-overwritten with the latest snapshot as the run progresses; `agent.log`
-records every model response and tool call/result — `tail -f` it to
-watch the agent reason live.
+Every run is auditable: it prints the outline/plan/log file paths at
+startup (default `/tmp/git-progressive`, override with `--audit-dir
+DIR`) — the same directory every run, truncated at the start of each
+one. `outline.md` and `plan.md` are overwritten with the latest
+snapshot as the run progresses; `agent.log` records every model
+response and tool call/result — `tail -f` it to watch the agent reason
+live.
 
 ## Backlog
 

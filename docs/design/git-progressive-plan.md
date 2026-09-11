@@ -97,8 +97,8 @@ a dependency-order error, then a valid plan.
       gets the same disk round-trip as the outline — written on a valid
       submit_plan, then re-read back off disk as what's actually handed
       to the commit builder — see `src/planner/validate.hpp`, `src/planner/planner.cpp` (`renderPlanMarkdown`, `parsePlanMarkdown`), `src/planner/tools.cpp` — depends: T6b.3, T3.2
-- [x] T6b.5 Auditability: every run writes a fresh timestamped directory
-      (default under `/tmp`, override with `--audit-dir`) with
+- [x] T6b.5 Auditability: every run reuses one fixed directory (default
+      `/tmp/git-progressive`, override with `--audit-dir`) with
       `outline.md`/`plan.md` overwritten with the latest snapshot on
       every update, and `agent.log` with every model response/tool call/
       tool result as it happens; the CLI prints the three file paths to
