@@ -21,6 +21,8 @@ add_executable(git-progressive
     src/git/repo.cpp
     src/diff/parser.cpp
     src/llm/ollama.cpp
+    src/llm/openai.cpp
+    src/llm/claude.cpp
     src/agent/loop.cpp
     src/audit/audit.cpp
     src/planner/outline.cpp

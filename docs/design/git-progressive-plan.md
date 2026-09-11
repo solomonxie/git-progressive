@@ -35,8 +35,8 @@ per-provider files are warranted.
 - [x] T4.1 Message/tool types (`ToolSpec`, `ToolCall`, `CompletionRequest`,
       `CompletionResponse`) and the `Provider` interface — see `src/llm/provider.hpp` — depends: T1.2
 - [x] T4.2 HTTP + JSON dependencies wired via CMake FetchContent (cpp-httplib, nlohmann/json) — see `CMakeLists.txt` — depends: T1.1
-- [ ] T4.3 OpenAI provider (function/tool-calling API), API key via env var — see `src/llm/openai.cpp` — depends: T4.1, T4.2
-- [ ] T4.4 Claude provider (tool-use API), API key via env var — see `src/llm/claude.cpp` — depends: T4.1, T4.2
+- [x] T4.3 OpenAI provider (function/tool-calling API), API key via env var — see `src/llm/openai.cpp` — depends: T4.1, T4.2
+- [x] T4.4 Claude provider (tool-use API), API key via env var — see `src/llm/claude.cpp` — depends: T4.1, T4.2
 - [x] T4.5 Ollama provider (local, no API key; `/api/chat` tool-calling, e.g. qwen3) — see `src/llm/ollama.cpp` — depends: T4.1, T4.2
 
 ## Phase 5: Agent loop runtime

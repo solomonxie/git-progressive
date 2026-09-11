@@ -4,17 +4,18 @@
 
 namespace gitprogressive {
 
-// Ollama (local, no API key) is the only backend implemented so far —
-// see docs/design/git-progressive.md. OpenAI/Claude remain the eventual
-// goal but aren't wired up yet. Named LlmBackend, not Provider, to avoid
-// colliding with llm::Provider (the client interface).
+// Named LlmBackend, not Provider, to avoid colliding with llm::Provider
+// (the client interface). OpenAI/Claude read their API key from
+// OPENAI_API_KEY/ANTHROPIC_API_KEY; Ollama needs none (local server).
 enum class LlmBackend { Ollama, OpenAI, Claude };
 
 struct Args {
     std::string range;
     std::string branchName = "progressive";
     LlmBackend provider = LlmBackend::Ollama;
-    std::string model = "qwen3:8b";
+    // Empty means "use the provider's default" — resolved in main() once
+    // the provider is known, since each backend's model names differ.
+    std::string model;
     std::string ollamaHost = "http://localhost:11434";
     bool dryRun = false;
     // Base directory for this run's outline/plan/log audit files — a
