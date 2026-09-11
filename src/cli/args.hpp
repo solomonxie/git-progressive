@@ -19,7 +19,7 @@ struct Args {
     bool dryRun = false;
     // Base directory for this run's outline/plan/log audit files — a
     // fresh timestamped subfolder is created under it. Empty means the
-    // default ($TMPDIR or /tmp).
+    // default (/tmp).
     std::string auditDir;
     bool valid = false;
 };

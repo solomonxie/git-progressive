@@ -98,18 +98,26 @@ passes over a shared **outline** document:
    the model original-commit context on demand. Output: a
    table-of-contents-style markdown outline — each item a category
    ("skeleton building", "feature: X", "infra: Y", ...) with pointers to
-   every hunk that belongs to it. Context per call is bounded (outline
-   size + one hunk), independent of total diff size.
-2. **Grouping pass**: feed the completed outline (not raw diffs) to the
-   model; ask it to group/order outline items into phases — same
+   every hunk that belongs to it. Each pointer line is self-describing —
+   `hunk_id — file:line-range` — so the file alone tells you what it
+   points to, without needing the in-memory hunk table. Context per call
+   is bounded (outline size + one hunk), independent of total diff size.
+2. **Grouping pass**: the outline pass's final write is re-read back off
+   `outline.md` from disk — not the in-memory `Outline` object — before
+   the grouping pass starts. The file is the real hand-off between
+   passes, not just an audit snapshot of one: it's what the model is
+   prompted with, and it's inspectable/editable by hand between the two
+   passes. Ask the model to group/order outline items into phases — same
    `submit_plan` contract as before: ordered `{title, rationale,
    item_refs[]}`.
 3. **Deterministic expansion**: phases reference outline items, outline
    items reference hunk IDs — expanding phase → hunk_ids is mechanical,
    no LLM involved. Re-run the hunk-dependency check (T3.2) on each
-   phase's expanded hunk list before handing off to the commit builder,
-   since two outline items sharing a phase can still touch overlapping
-   hunks out of appliable order.
+   phase's expanded hunk list before handing off to the commit builder.
+   `plan.md` gets the same disk round-trip as the outline: written on a
+   valid `submit_plan`, then re-read back off disk (again self-describing,
+   `hunk_id — file:line-range`) as what the commit builder actually
+   consumes.
 
 This bounds per-call LLM context regardless of total diff size (answers
 the "diff size vs LLM context" risk below) and narrows non-determinism to

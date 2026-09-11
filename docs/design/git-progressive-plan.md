@@ -76,22 +76,29 @@ against this repo's own history (`qwen3:4b-instruct-2507-q8_0`,
 `--dry-run`): outline built hunk-by-hunk, a self-correction round-trip on
 a dependency-order error, then a valid plan.
 
-- [x] T6b.1 Outline data model + markdown serialization: item = category/
-      title + pointers `{file, hunk_id}` (no commit_id — hunks come from
-      one flattened range diff, not per-original-commit) — see `src/planner/outline.hpp` — depends: T3.1
+- [x] T6b.1 Outline data model + self-describing markdown serialization:
+      item = category/title + pointers `{hunk_id}`, each pointer line
+      rendered as `hunk_id — file:line-range` (looked up from the hunk
+      table at render time, no commit_id — hunks come from one flattened
+      range diff, not per-original-commit) plus a parser that
+      reconstructs item id/title/hunk-id membership from that output — see `src/planner/outline.hpp` (`renderOutline`, `parseOutline`) — depends: T3.1
 - [x] T6b.2 Outline-builder: iterate hunks in original diff order; per
       hunk, prompt with (current outline text, hunk diff) → append a
       pointer to a matched item or create a new one; reuses T6.2's
       read_file/read_commit_messages tools for extra context — see `src/planner/tools.cpp` (`ClassifyHunkTool`), `src/planner/planner.cpp` (`buildOutline`) — depends: T6b.1, T6.2
-- [x] T6b.3 Grouping pass: feed the completed outline to the model, ask
-      it to group/order outline items into phases (`submit_plan`-style:
-      ordered `{title, rationale, item_ids[]}`) — see `src/planner/tools.cpp` (`SubmitOutlinePlanTool`) — depends: T6b.1, T6.3
+- [x] T6b.3 Grouping pass: outline.md is re-read back off disk (not the
+      in-memory Outline) before this pass starts, so the file is the
+      real hand-off contract between passes; ask the model to group/
+      order outline items into phases (`submit_plan`-style: ordered
+      `{title, rationale, item_ids[]}`) — see `src/planner/planner.cpp` (`planPhases`), `src/planner/tools.cpp` (`SubmitOutlinePlanTool`) — depends: T6b.1, T6.3
 - [x] T6b.4 Deterministic expansion: phase → item_ids → hunk_ids is
       mechanical (no LLM); reuses the shared `validatePlan` (T3.2
-      dependency check + coverage) on the expanded hunk list before
-      handing off to the commit builder — see `src/planner/validate.hpp`, `src/planner/tools.cpp` — depends: T6b.3, T3.2
+      dependency check + coverage) on the expanded hunk list. plan.md
+      gets the same disk round-trip as the outline — written on a valid
+      submit_plan, then re-read back off disk as what's actually handed
+      to the commit builder — see `src/planner/validate.hpp`, `src/planner/planner.cpp` (`renderPlanMarkdown`, `parsePlanMarkdown`), `src/planner/tools.cpp` — depends: T6b.3, T3.2
 - [x] T6b.5 Auditability: every run writes a fresh timestamped directory
-      (default under `$TMPDIR`/`/tmp`, override with `--audit-dir`) with
+      (default under `/tmp`, override with `--audit-dir`) with
       `outline.md`/`plan.md` overwritten with the latest snapshot on
       every update, and `agent.log` with every model response/tool call/
       tool result as it happens; the CLI prints the three file paths to

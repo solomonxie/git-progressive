@@ -31,8 +31,14 @@ struct Plan {
 Plan planPhases(const std::vector<Hunk>& hunks, const Repository& repo, const Repository::Range& range,
                  Provider& provider, Audit& audit);
 
-// Renders a plan as markdown (phases in order, title + rationale + hunk
-// ids) — used for the plan.md audit snapshot.
-std::string renderPlanMarkdown(const Plan& plan);
+// Renders a plan as markdown: one heading per phase (title + rationale)
+// and one bullet per hunk with its file:line-range looked up from
+// `hunks` — self-describing, same pattern as outline.hpp's renderOutline.
+std::string renderPlanMarkdown(const Plan& plan, const std::vector<Hunk>& hunks);
+
+// Reconstructs phases (title/rationale/hunk-id membership) from
+// renderPlanMarkdown's output — the commit builder is handed the plan
+// read back off plan.md, not the in-memory Plan the grouping pass built.
+Plan parsePlanMarkdown(const std::string& markdown);
 
 } // namespace gitprogressive

@@ -1,6 +1,5 @@
 #include "audit/audit.hpp"
 
-#include <cstdlib>
 #include <ctime>
 #include <filesystem>
 #include <iomanip>
@@ -21,18 +20,14 @@ std::string timestamp(const char* fmt) {
     return os.str();
 }
 
-std::string defaultBaseDir() {
-    const char* tmpdir = std::getenv("TMPDIR");
-    std::string base = (tmpdir && *tmpdir) ? tmpdir : "/tmp";
-    if (base.size() > 1 && base.back() == '/') base.pop_back();
-    return base;
-}
-
 } // namespace
 
 AuditPaths resolveAuditPaths(const std::string& overrideDir) {
     AuditPaths paths;
-    std::string base = overrideDir.empty() ? defaultBaseDir() : overrideDir;
+    // Always /tmp by default — not $TMPDIR (macOS's per-user, per-boot
+    // /var/folders/... path), so the location is predictable and the
+    // same across runs/machines. --audit-dir overrides.
+    std::string base = overrideDir.empty() ? "/tmp" : overrideDir;
     paths.dir = base + "/git-progressive-" + timestamp("%Y%m%d-%H%M%S");
     fs::create_directories(paths.dir);
     paths.outlinePath = paths.dir + "/outline.md";
