@@ -1,6 +1,8 @@
 #include "planner/planner.hpp"
 
+#include <fstream>
 #include <sstream>
+#include <unordered_map>
 
 #include "agent/loop.hpp"
 #include "planner/outline.hpp"
@@ -37,18 +39,29 @@ const char* kGroupingSystemPrompt =
     "Call submit_plan with each phase's title, rationale, and the item_ids it carries. If "
     "submit_plan returns errors, fix the plan and call it again.";
 
-std::string outlinePrompt(const Outline& outline, const Hunk& hunk) {
+// Empty string if the file doesn't exist yet (e.g. the grouping pass
+// never produced a valid plan) — callers treat that the same as "no
+// result" rather than crashing on a missing audit file.
+std::string readFile(const std::string& path) {
+    std::ifstream in(path);
+    if (!in) return "";
+    std::ostringstream ss;
+    ss << in.rdbuf();
+    return ss.str();
+}
+
+std::string outlinePrompt(const Outline& outline, const std::vector<Hunk>& hunks, const Hunk& hunk) {
     std::ostringstream os;
     os << "Outline so far:\n\n"
-       << outline.toMarkdown() << "\nHunk to classify — file: " << hunk.file << "\n```diff\n"
-       << hunk.text << "```\n"
+       << renderOutline(outline, hunks) << "\nHunk to classify — file: " << hunk.file << "\n```diff\n" << hunk.text
+       << "```\n"
        << "Call classify_hunk to place this hunk.";
     return os.str();
 }
 
-std::string groupingPrompt(const Outline& outline) {
+std::string groupingPrompt(const Outline& outline, const std::vector<Hunk>& hunks) {
     std::ostringstream os;
-    os << "Group this outline into progressive phases:\n\n" << outline.toMarkdown();
+    os << "Group this outline into progressive phases:\n\n" << renderOutline(outline, hunks);
     return os.str();
 }
 
@@ -66,7 +79,7 @@ Outline buildOutline(const std::vector<Hunk>& hunks, const Repository& repo, con
 
         auto tools = buildOutlineTools(outline, hunk, repo, range);
         AgentLoop loop(provider, kOutlineSystemPrompt, std::move(tools), logger);
-        std::string result = loop.run(outlinePrompt(outline, hunk), "classify_hunk", 5);
+        std::string result = loop.run(outlinePrompt(outline, hunks, hunk), "classify_hunk", 5);
 
         if (result.empty()) {
             // classify_hunk cap hit without a valid call — file it alone
@@ -78,40 +91,107 @@ Outline buildOutline(const std::vector<Hunk>& hunks, const Repository& repo, con
             outline.items.push_back(std::move(fallback));
             audit.log("[outline] hunk " + hunk.id + " fell back to its own item (classify_hunk cap hit)");
         }
-        audit.writeOutline(outline.toMarkdown());
+        audit.writeOutline(renderOutline(outline, hunks));
     }
     return outline;
 }
 
+std::string trim(const std::string& s) {
+    size_t start = s.find_first_not_of(" \t\r\n");
+    if (start == std::string::npos) return "";
+    size_t end = s.find_last_not_of(" \t\r\n");
+    return s.substr(start, end - start + 1);
+}
+
 } // namespace
 
-std::string renderPlanMarkdown(const Plan& plan) {
+std::string renderPlanMarkdown(const Plan& plan, const std::vector<Hunk>& hunks) {
+    std::unordered_map<std::string, const Hunk*> byId;
+    for (const auto& hunk : hunks) byId[hunk.id] = &hunk;
+
     std::ostringstream os;
     os << "# Progressive plan\n\n";
     for (size_t i = 0; i < plan.phases.size(); ++i) {
         const auto& phase = plan.phases[i];
         os << "## " << (i + 1) << ". " << phase.title << "\n\n" << phase.rationale << "\n\n";
-        for (const auto& id : phase.hunkIds) os << "- " << id << "\n";
+        for (const auto& id : phase.hunkIds) {
+            auto it = byId.find(id);
+            os << "- " << id << " — ";
+            if (it != byId.end()) {
+                os << it->second->file << ":" << it->second->newStart << "-"
+                   << (it->second->newStart + it->second->newLines - 1);
+            } else {
+                os << "(unknown hunk)";
+            }
+            os << "\n";
+        }
         os << "\n";
     }
     return os.str();
+}
+
+Plan parsePlanMarkdown(const std::string& markdown) {
+    Plan plan;
+    std::istringstream stream(markdown);
+    std::string line;
+    Phase* current = nullptr;
+    bool inRationale = false;
+
+    while (std::getline(stream, line)) {
+        if (line.rfind("## ", 0) == 0) {
+            std::string rest = line.substr(3);
+            size_t sep = rest.find(". ");
+            Phase phase;
+            phase.title = trim(sep == std::string::npos ? rest : rest.substr(sep + 2));
+            plan.phases.push_back(std::move(phase));
+            current = &plan.phases.back();
+            inRationale = true;
+            continue;
+        }
+        if (!current) continue;
+        if (line.rfind("- ", 0) == 0) {
+            inRationale = false;
+            std::string rest = line.substr(2);
+            size_t space = rest.find(' ');
+            std::string hunkId = trim(space == std::string::npos ? rest : rest.substr(0, space));
+            if (!hunkId.empty()) current->hunkIds.push_back(hunkId);
+            continue;
+        }
+        std::string trimmed = trim(line);
+        if (trimmed.empty() || !inRationale) continue;
+        if (!current->rationale.empty()) current->rationale += " ";
+        current->rationale += trimmed;
+    }
+    return plan;
 }
 
 Plan planPhases(const std::vector<Hunk>& hunks, const Repository& repo, const Repository::Range& range,
                  Provider& provider, Audit& audit) {
     audit.log("outline pass: classifying " + std::to_string(hunks.size()) + " hunks...");
     Outline outline = buildOutline(hunks, repo, range, provider, audit);
-    audit.writeOutline(outline.toMarkdown());
-    audit.log("outline pass done: " + std::to_string(outline.items.size()) + " items. grouping pass: ordering into phases...");
+    audit.writeOutline(renderOutline(outline, hunks));
+
+    // Round-trip through disk: the grouping pass reads outline.md back
+    // off disk rather than reusing the in-memory Outline built above, so
+    // the file is the actual hand-off contract between passes, not just
+    // an audit snapshot of it.
+    Outline outlineFromDisk = parseOutline(readFile(audit.paths().outlinePath));
+    audit.log("outline pass done: " + std::to_string(outlineFromDisk.items.size()) + " items (re-read from " +
+               audit.paths().outlinePath + "). grouping pass: ordering into phases...");
 
     auto plan = std::make_shared<Plan>();
-    auto tools = buildGroupingTools(hunks, outline, plan, audit);
+    auto tools = buildGroupingTools(hunks, outlineFromDisk, plan, audit);
     AgentLogFn logger = [&audit](const std::string& line) { audit.log("[group] " + line); };
     AgentLoop loop(provider, kGroupingSystemPrompt, std::move(tools), logger);
-    loop.run(groupingPrompt(outline), "submit_plan", 10);
+    loop.run(groupingPrompt(outlineFromDisk, hunks), "submit_plan", 10);
 
-    audit.writePlan(renderPlanMarkdown(*plan));
-    return *plan;
+    // Same round-trip for the plan: the commit builder gets what's on
+    // disk in plan.md (written by submit_plan on success), not just
+    // what the tool call captured in memory.
+    Plan planFromDisk = parsePlanMarkdown(readFile(audit.paths().planPath));
+    audit.log("grouping pass done: " + std::to_string(planFromDisk.phases.size()) + " phases (re-read from " +
+               audit.paths().planPath + ")");
+    return planFromDisk;
 }
 
 } // namespace gitprogressive

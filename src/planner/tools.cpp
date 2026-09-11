@@ -306,7 +306,7 @@ public:
         }
 
         *outPlan_ = std::move(plan);
-        audit_.writePlan(renderPlanMarkdown(*outPlan_));
+        audit_.writePlan(renderPlanMarkdown(*outPlan_, hunks_));
         return json{{"ok", true}}.dump();
     }
 
