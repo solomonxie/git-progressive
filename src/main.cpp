@@ -5,8 +5,12 @@
 #include "commit/builder.hpp"
 #include "diff/parser.hpp"
 #include "git/repo.hpp"
+#include "llm/claude.hpp"
 #include "llm/ollama.hpp"
+#include "llm/openai.hpp"
 #include "planner/planner.hpp"
+
+#include <memory>
 
 // git-progressive: reorders a branch/commit range's diff into a
 // progressive, onion-layer commit sequence via a local LLM. See
@@ -17,11 +21,7 @@ int main(int argc, char** argv) {
     Args args = parseArgs(argc, argv);
     if (!args.valid) {
         std::cerr << "usage: git-progressive <branch-or-range> [--branch-name NAME] "
-                     "[--provider ollama] [--model NAME] [--host URL] [--audit-dir DIR] [--dry-run]\n";
-        return 1;
-    }
-    if (args.provider != LlmBackend::Ollama) {
-        std::cerr << "git-progressive: only --provider ollama is implemented so far\n";
+                     "[--provider ollama|openai|claude] [--model NAME] [--host URL] [--audit-dir DIR] [--dry-run]\n";
         return 1;
     }
 
@@ -29,6 +29,22 @@ int main(int argc, char** argv) {
     audit.printBanner();
 
     try {
+        std::unique_ptr<Provider> provider;
+        switch (args.provider) {
+            case LlmBackend::Ollama:
+                if (args.model.empty()) args.model = "qwen3:8b";
+                provider = std::make_unique<OllamaProvider>(args.model, args.ollamaHost);
+                break;
+            case LlmBackend::OpenAI:
+                if (args.model.empty()) args.model = "gpt-5.1";
+                provider = std::make_unique<OpenAiProvider>(args.model);
+                break;
+            case LlmBackend::Claude:
+                if (args.model.empty()) args.model = "claude-sonnet-5";
+                provider = std::make_unique<ClaudeProvider>(args.model);
+                break;
+        }
+
         Repository repo;
         Repository::Range range = repo.resolveRange(args.range);
         std::cerr << "git-progressive: range " << range.base << ".." << range.head << "\n";
@@ -41,8 +57,7 @@ int main(int argc, char** argv) {
         }
         std::cerr << "git-progressive: " << hunks.size() << " hunks, planning with " << args.model << "...\n";
 
-        OllamaProvider provider(args.model, args.ollamaHost);
-        Plan plan = planPhases(hunks, repo, range, provider, audit);
+        Plan plan = planPhases(hunks, repo, range, *provider, audit);
         if (plan.phases.empty()) {
             std::cerr << "git-progressive: planner did not produce a valid plan\n";
             return 1;

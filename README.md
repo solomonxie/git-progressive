@@ -1,6 +1,6 @@
 # git-progressive
 
-**Status: functional end-to-end, backed by a local Ollama model.**
+**Status: functional end-to-end. Ollama, OpenAI, and Claude backends.**
 
 A terminal tool that takes a git branch (PR branch, `master`) or a commit
 range and uses an LLM to reorganize the diff into a **progressive**
@@ -54,8 +54,8 @@ Or via the `Makefile` wrapper: `make build`, `make dry-run RANGE=master`,
 
 ## Run
 
-Requires a local [Ollama](https://ollama.com) server with a tool-calling
-model pulled (default `qwen3:8b`):
+Default backend is a local [Ollama](https://ollama.com) server with a
+tool-calling model pulled (default `qwen3:8b`):
 
 ```
 ollama pull qwen3:8b
@@ -64,8 +64,16 @@ ollama pull qwen3:8b
 ./build/git-progressive feature-branch --branch-name review --model qwen3:8b-q4_K_M
 ```
 
-OpenAI/Claude backends are designed for (see design doc) but not yet
-implemented — only `--provider ollama` (the default) works today.
+OpenAI and Claude also work — API key via `OPENAI_API_KEY`/`ANTHROPIC_API_KEY`,
+no local server needed:
+
+```
+export OPENAI_API_KEY=...
+./build/git-progressive feature-branch --provider openai --model gpt-5.1
+
+export ANTHROPIC_API_KEY=...
+./build/git-progressive feature-branch --provider claude --model claude-sonnet-5
+```
 
 Every run is auditable: it prints the outline/plan/log file paths for
 that run before doing anything else (default under `/tmp`,

@@ -21,7 +21,7 @@ LLM to restructure the change for reading, not to write or judge it.
   building on the ones before it.
 - Support both OpenAI and Claude as the LLM backend (user-supplied API key).
   Also supports local Ollama models (e.g. qwen3) — no API key, runs fully
-  offline. Ollama is the only backend implemented so far; it's the default.
+  offline. Ollama is the default; all three are implemented.
 - Work on a whole-repo range too (e.g. `master`): first commit = skeleton
   (entry point, configs, build files, API interfaces), later commits layer
   in implementation, logging, architecture changes — same progressive idea
@@ -140,7 +140,7 @@ outline so it has complete history to match against.
 - `git` — resolves ranges, diffs, branch creation (shells out to `git`).
 - `diff` — parses unified diff into hunks, detects same-file hunk
   dependencies.
-- `llm` — provider clients (Ollama implemented; OpenAI, Claude planned)
+- `llm` — provider clients (Ollama, OpenAI, Claude)
   speaking each API's tool-calling protocol.
 - `agent` — generic tool-calling loop: send messages+tools, dispatch
   tool calls, append results, repeat until a terminal call or iteration
