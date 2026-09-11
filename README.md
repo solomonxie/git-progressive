@@ -32,6 +32,11 @@ change for reading, not to judge or write it.
 See [`docs/design/git-progressive.md`](docs/design/git-progressive.md) and
 the [implementation plan](docs/design/git-progressive-plan.md).
 
+Planner: builds a compact category **outline** one hunk at a time
+(bounded LLM context regardless of diff size), then group/orders the
+outline into phases, then deterministically expands outline → hunks. See
+design doc for detail.
+
 ## Build
 
 ```
@@ -42,6 +47,9 @@ cmake --build build
 
 C++17, CMake. No system-wide installs — dependencies (cpp-httplib,
 nlohmann/json) are fetched into `build/` via CMake FetchContent.
+
+Or via the `Makefile` wrapper: `make build`, `make dry-run RANGE=master`,
+`make run RANGE=master`, `make clean`.
 
 ## Run
 
@@ -57,6 +65,13 @@ ollama pull qwen3:8b
 
 OpenAI/Claude backends are designed for (see design doc) but not yet
 implemented — only `--provider ollama` (the default) works today.
+
+Every run is auditable: it prints the outline/plan/log file paths for
+that run before doing anything else (default under `$TMPDIR`/`/tmp`,
+override with `--audit-dir DIR`). `outline.md` and `plan.md` are
+overwritten with the latest snapshot as the run progresses; `agent.log`
+records every model response and tool call/result — `tail -f` it to
+watch the agent reason live.
 
 ## Backlog
 
