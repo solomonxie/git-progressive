@@ -20,6 +20,8 @@ LLM to restructure the change for reading, not to write or judge it.
 - Each commit should read like a step in a lesson: reviewable on its own,
   building on the ones before it.
 - Support both OpenAI and Claude as the LLM backend (user-supplied API key).
+  Also supports local Ollama models (e.g. qwen3) — no API key, runs fully
+  offline. Ollama is the only backend implemented so far; it's the default.
 - Work on a whole-repo range too (e.g. `master`): first commit = skeleton
   (entry point, configs, build files, API interfaces), later commits layer
   in implementation, logging, architecture changes — same progressive idea
@@ -85,8 +87,8 @@ of LLM mistakes to "bad ordering," never "corrupted code."
 - `git` — resolves ranges, diffs, branch creation (shells out to `git`).
 - `diff` — parses unified diff into hunks, detects same-file hunk
   dependencies.
-- `llm` — provider clients (OpenAI, Claude) speaking each API's
-  tool-calling protocol.
+- `llm` — provider clients (Ollama implemented; OpenAI, Claude planned)
+  speaking each API's tool-calling protocol.
 - `agent` — generic tool-calling loop: send messages+tools, dispatch
   tool calls, append results, repeat until a terminal call or iteration
   cap. Not planner-specific, so any future agent can reuse it.
