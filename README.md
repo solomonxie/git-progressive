@@ -1,12 +1,12 @@
 # git-progressive
 
-**Status: work in progress — skeleton only, not yet functional.**
+**Status: functional end-to-end, backed by a local Ollama model.**
 
 A terminal tool that takes a git branch (PR branch, `master`) or a commit
-range and uses an LLM (OpenAI or Claude) to reorganize the diff into a
-**progressive** sequence of commits — core change first, then side
-changes, then features layered on, like onion layers — so a reviewer can
-read phase by phase instead of facing one flat wall of diff.
+range and uses an LLM to reorganize the diff into a **progressive**
+sequence of commits — core change first, then side changes, then
+features layered on, like onion layers — so a reviewer can read phase by
+phase instead of facing one flat wall of diff.
 
 Point it at `master` and it works the same way for onboarding: phase 1 is
 the repo skeleton (entry point, configs, build files, API interfaces),
@@ -40,8 +40,23 @@ cmake --build build
 ./build/git-progressive <branch-or-range>
 ```
 
-C++17, CMake. No system-wide installs — dependencies (once added) are
-fetched into `build/` via CMake FetchContent.
+C++17, CMake. No system-wide installs — dependencies (cpp-httplib,
+nlohmann/json) are fetched into `build/` via CMake FetchContent.
+
+## Run
+
+Requires a local [Ollama](https://ollama.com) server with a tool-calling
+model pulled (default `qwen3:8b`):
+
+```
+ollama pull qwen3:8b
+./build/git-progressive master --dry-run          # print the plan only
+./build/git-progressive feature-branch            # create branch 'progressive'
+./build/git-progressive feature-branch --branch-name review --model qwen3:8b-q4_K_M
+```
+
+OpenAI/Claude backends are designed for (see design doc) but not yet
+implemented — only `--provider ollama` (the default) works today.
 
 ## Backlog
 
