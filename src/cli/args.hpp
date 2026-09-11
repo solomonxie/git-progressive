@@ -18,9 +18,8 @@ struct Args {
     std::string model;
     std::string ollamaHost = "http://localhost:11434";
     bool dryRun = false;
-    // Base directory for this run's outline/plan/log audit files — a
-    // fresh timestamped subfolder is created under it. Empty means the
-    // default (/tmp).
+    // Directory for the outline/plan/log audit files, reused (and
+    // truncated) across runs. Empty means the default (/tmp/git-progressive).
     std::string auditDir;
     bool valid = false;
 };

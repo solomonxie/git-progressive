@@ -12,9 +12,10 @@ struct AuditPaths {
     std::string logPath;
 };
 
-// Resolves a fresh timestamped run directory under `overrideDir` (or
-// $TMPDIR/tmp by default) and creates it. Empty overrideDir means use the
-// default base.
+// Resolves the audit directory (default `/tmp/git-progressive`, or
+// `overrideDir` if given) and creates it. The same directory is reused
+// across runs — outline.md/plan.md/agent.log are truncated at the start
+// of each run, so it always reflects the latest run only.
 AuditPaths resolveAuditPaths(const std::string& overrideDir);
 
 // Keeps a run auditable while it's in progress: outline.md and plan.md

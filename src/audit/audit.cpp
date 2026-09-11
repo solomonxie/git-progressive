@@ -26,9 +26,10 @@ AuditPaths resolveAuditPaths(const std::string& overrideDir) {
     AuditPaths paths;
     // Always /tmp by default — not $TMPDIR (macOS's per-user, per-boot
     // /var/folders/... path), so the location is predictable and the
-    // same across runs/machines. --audit-dir overrides.
-    std::string base = overrideDir.empty() ? "/tmp" : overrideDir;
-    paths.dir = base + "/git-progressive-" + timestamp("%Y%m%d-%H%M%S");
+    // same across runs/machines. --audit-dir overrides. One reused
+    // directory (not a fresh one per run) so it's a fixed place to
+    // `tail -f`/bookmark instead of hunting for the latest timestamp.
+    paths.dir = overrideDir.empty() ? "/tmp/git-progressive" : overrideDir;
     fs::create_directories(paths.dir);
     paths.outlinePath = paths.dir + "/outline.md";
     paths.planPath = paths.dir + "/plan.md";
