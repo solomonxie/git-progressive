@@ -1,0 +1,43 @@
+#pragma once
+
+#include <fstream>
+#include <string>
+
+namespace gitprogressive {
+
+struct AuditPaths {
+    std::string dir;
+    std::string outlinePath;
+    std::string planPath;
+    std::string logPath;
+};
+
+// Resolves a fresh timestamped run directory under `overrideDir` (or
+// $TMPDIR/tmp by default) and creates it. Empty overrideDir means use the
+// default base.
+AuditPaths resolveAuditPaths(const std::string& overrideDir);
+
+// Keeps a run auditable while it's in progress: outline.md and plan.md
+// are overwritten with the latest snapshot on every update (not just at
+// the end), and every agent decision is appended to agent.log and
+// echoed to stdout live.
+class Audit {
+public:
+    explicit Audit(AuditPaths paths);
+
+    const AuditPaths& paths() const { return paths_; }
+
+    // Prints the file locations to stdout — call once at startup, before
+    // anything else runs, so the user knows what to watch.
+    void printBanner() const;
+
+    void log(const std::string& line);
+    void writeOutline(const std::string& markdown);
+    void writePlan(const std::string& markdown);
+
+private:
+    AuditPaths paths_;
+    std::ofstream logFile_;
+};
+
+} // namespace gitprogressive

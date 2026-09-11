@@ -17,6 +17,10 @@ struct Args {
     std::string model = "qwen3:8b";
     std::string ollamaHost = "http://localhost:11434";
     bool dryRun = false;
+    // Base directory for this run's outline/plan/log audit files — a
+    // fresh timestamped subfolder is created under it. Empty means the
+    // default ($TMPDIR or /tmp).
+    std::string auditDir;
     bool valid = false;
 };
 

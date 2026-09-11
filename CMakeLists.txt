@@ -22,6 +22,9 @@ add_executable(git-progressive
     src/diff/parser.cpp
     src/llm/ollama.cpp
     src/agent/loop.cpp
+    src/audit/audit.cpp
+    src/planner/outline.cpp
+    src/planner/validate.cpp
     src/planner/tools.cpp
     src/planner/planner.cpp
     src/commit/builder.cpp

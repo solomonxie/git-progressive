@@ -82,6 +82,51 @@ of LLM mistakes to "bad ordering," never "corrupted code."
   means: an agent that explores before committing to an answer, not one
   blind guess.
 
+## Planner: two-pass outline-then-plan (chosen)
+
+Grouping every hunk into phases in one session doesn't scale: context
+blows up on large diffs, and it's one big free-form decision the model
+has to get right all at once. Instead, the planner runs two bounded
+passes over a shared **outline** document:
+
+1. **Outline pass**: iterate hunks in original commit order. For each
+   hunk, prompt the model with (current outline text, this hunk's diff)
+   and ask it to either append a pointer (`file`, `hunk_id`) to a
+   matching existing outline item, or create a new one — hunks come
+   from one flattened range diff, not per-original-commit, so there's
+   no commit id to track per hunk; `read_commit_messages` still gives
+   the model original-commit context on demand. Output: a
+   table-of-contents-style markdown outline — each item a category
+   ("skeleton building", "feature: X", "infra: Y", ...) with pointers to
+   every hunk that belongs to it. Context per call is bounded (outline
+   size + one hunk), independent of total diff size.
+2. **Grouping pass**: feed the completed outline (not raw diffs) to the
+   model; ask it to group/order outline items into phases — same
+   `submit_plan` contract as before: ordered `{title, rationale,
+   item_refs[]}`.
+3. **Deterministic expansion**: phases reference outline items, outline
+   items reference hunk IDs — expanding phase → hunk_ids is mechanical,
+   no LLM involved. Re-run the hunk-dependency check (T3.2) on each
+   phase's expanded hunk list before handing off to the commit builder,
+   since two outline items sharing a phase can still touch overlapping
+   hunks out of appliable order.
+
+This bounds per-call LLM context regardless of total diff size (answers
+the "diff size vs LLM context" risk below) and narrows non-determinism to
+two decision points (per-hunk classification, item grouping) — the final
+hunk→phase mapping is always a deterministic expansion of the outline
+and plan. Supersedes the single-session tool-calling loop above for the
+*final grouping* decision; its read-side tools (`read_hunk`, `read_file`,
+`read_commit_messages`) stay reusable — the outline pass can call them
+too when a hunk's classification needs more context than its diff alone.
+
+**Outline drift risk**: classification happens one hunk at a time, so
+the model can conflate two distinct concerns into one item, or split one
+concern across near-duplicate items, over a long run. Mitigate with a
+small fixed set of top-level category prefixes (skeleton/feature/infra/
+system/clean/robust) and always showing the model the full existing
+outline so it has complete history to match against.
+
 ## Architecture
 
 - `git` — resolves ranges, diffs, branch creation (shells out to `git`).

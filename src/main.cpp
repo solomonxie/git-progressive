@@ -1,5 +1,6 @@
 #include <iostream>
 
+#include "audit/audit.hpp"
 #include "cli/args.hpp"
 #include "commit/builder.hpp"
 #include "diff/parser.hpp"
@@ -16,13 +17,16 @@ int main(int argc, char** argv) {
     Args args = parseArgs(argc, argv);
     if (!args.valid) {
         std::cerr << "usage: git-progressive <branch-or-range> [--branch-name NAME] "
-                     "[--provider ollama] [--model NAME] [--host URL] [--dry-run]\n";
+                     "[--provider ollama] [--model NAME] [--host URL] [--audit-dir DIR] [--dry-run]\n";
         return 1;
     }
     if (args.provider != LlmBackend::Ollama) {
         std::cerr << "git-progressive: only --provider ollama is implemented so far\n";
         return 1;
     }
+
+    Audit audit(resolveAuditPaths(args.auditDir));
+    audit.printBanner();
 
     try {
         Repository repo;
@@ -38,7 +42,7 @@ int main(int argc, char** argv) {
         std::cerr << "git-progressive: " << hunks.size() << " hunks, planning with " << args.model << "...\n";
 
         OllamaProvider provider(args.model, args.ollamaHost);
-        Plan plan = planPhases(hunks, repo, range, provider);
+        Plan plan = planPhases(hunks, repo, range, provider, audit);
         if (plan.phases.empty()) {
             std::cerr << "git-progressive: planner did not produce a valid plan\n";
             return 1;

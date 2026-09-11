@@ -4,6 +4,8 @@
 
 #include <unordered_map>
 
+#include "planner/validate.hpp"
+
 namespace gitprogressive {
 
 using json = nlohmann::json;
@@ -128,49 +130,6 @@ private:
     Repository::Range range_;
 };
 
-// T6.3: full coverage (every hunk assigned exactly once) + dependency
-// order (a hunk's dependsOn ids must land in the same or an earlier
-// phase). Returns a list of human-readable errors; empty means valid.
-std::vector<std::string> validate(const std::vector<Hunk>& hunks, const Plan& plan) {
-    std::vector<std::string> errors;
-    std::unordered_map<std::string, const Hunk*> byId;
-    for (const auto& hunk : hunks) byId[hunk.id] = &hunk;
-
-    std::unordered_map<std::string, int> phaseOf;
-    for (size_t p = 0; p < plan.phases.size(); ++p) {
-        for (const auto& id : plan.phases[p].hunkIds) {
-            if (!byId.count(id)) {
-                errors.push_back("phase '" + plan.phases[p].title + "' references unknown hunk id: " + id);
-                continue;
-            }
-            if (phaseOf.count(id)) {
-                errors.push_back("hunk " + id + " assigned to more than one phase");
-                continue;
-            }
-            phaseOf[id] = static_cast<int>(p);
-        }
-    }
-    for (const auto& hunk : hunks) {
-        if (!phaseOf.count(hunk.id)) {
-            errors.push_back("hunk " + hunk.id + " not assigned to any phase");
-        }
-    }
-    for (const auto& hunk : hunks) {
-        auto it = phaseOf.find(hunk.id);
-        if (it == phaseOf.end()) continue;
-        for (const auto& depId : hunk.dependsOn) {
-            auto depIt = phaseOf.find(depId);
-            if (depIt == phaseOf.end()) continue; // already reported as missing above
-            if (depIt->second > it->second) {
-                errors.push_back("hunk " + hunk.id + " depends on " + depId +
-                                  " but is scheduled in an earlier phase (" + std::to_string(it->second) +
-                                  " < " + std::to_string(depIt->second) + ")");
-            }
-        }
-    }
-    return errors;
-}
-
 class SubmitPlanTool : public Tool {
 public:
     SubmitPlanTool(const std::vector<Hunk>& hunks, std::shared_ptr<Plan> outPlan)
@@ -204,7 +163,7 @@ public:
             return json{{"ok", false}, {"errors", json::array({std::string("invalid submit_plan arguments: ") + e.what()})}}.dump();
         }
 
-        std::vector<std::string> errors = validate(hunks_, plan);
+        std::vector<std::string> errors = validatePlan(hunks_, plan);
         if (!errors.empty()) {
             return json{{"ok", false}, {"errors", errors}}.dump();
         }
@@ -215,6 +174,147 @@ public:
 private:
     const std::vector<Hunk>& hunks_;
     std::shared_ptr<Plan> outPlan_;
+};
+
+// Outline pass (T6b.2): the model either appends this hunk to an
+// existing item (by id) or creates a new one with a short title. State
+// lives in the shared `Outline`, mutated in place.
+class ClassifyHunkTool : public Tool {
+public:
+    ClassifyHunkTool(Outline& outline, const Hunk& hunk) : outline_(outline), hunk_(hunk) {}
+
+    ToolSpec spec() const override {
+        return {"classify_hunk",
+                "Decide where this hunk belongs in the outline: append it to an existing item "
+                "by item_id, or create a new one with a short category title (e.g. 'skeleton "
+                "building', 'feature: add search endpoint', 'infra: switch to postgres').",
+                R"({"type":"object","properties":{)"
+                R"("action":{"type":"string","enum":["append","new"]},)"
+                R"("item_id":{"type":"string"},)"
+                R"("title":{"type":"string"}},"required":["action"]})"};
+    }
+
+    std::string invoke(const std::string& argumentsJson) override {
+        json args;
+        try {
+            args = json::parse(argumentsJson);
+        } catch (const json::exception& e) {
+            return json{{"ok", false}, {"error", e.what()}}.dump();
+        }
+        std::string action = args.value("action", "");
+        if (action == "append") {
+            std::string itemId = args.value("item_id", "");
+            for (auto& item : outline_.items) {
+                if (item.id == itemId) {
+                    item.hunkIds.push_back(hunk_.id);
+                    return json{{"ok", true}}.dump();
+                }
+            }
+            json existingIds = json::array();
+            for (const auto& item : outline_.items) existingIds.push_back(item.id);
+            return json{{"ok", false}, {"error", "unknown item_id: " + itemId}, {"existing_item_ids", existingIds}}
+                .dump();
+        }
+        if (action == "new") {
+            std::string title = args.value("title", "");
+            if (title.empty()) {
+                return json{{"ok", false}, {"error", "a new item requires a non-empty title"}}.dump();
+            }
+            OutlineItem item;
+            item.id = "item-" + std::to_string(outline_.items.size() + 1);
+            item.title = title;
+            item.hunkIds = {hunk_.id};
+            outline_.items.push_back(std::move(item));
+            return json{{"ok", true}, {"item_id", outline_.items.back().id}}.dump();
+        }
+        return json{{"ok", false}, {"error", "action must be 'append' or 'new'"}}.dump();
+    }
+
+private:
+    Outline& outline_;
+    const Hunk& hunk_;
+};
+
+// Grouping pass (T6b.3/T6b.4): submit_plan over outline item_ids. Every
+// item's hunk ids are expanded into the phase before validating, so
+// hunk-level validatePlan (coverage + dependency order) doubles as
+// item-level coverage validation too — an unreferenced or
+// doubly-referenced item shows up as its hunks being unassigned/
+// duplicated.
+class SubmitOutlinePlanTool : public Tool {
+public:
+    SubmitOutlinePlanTool(const std::vector<Hunk>& hunks, const Outline& outline, std::shared_ptr<Plan> outPlan,
+                           Audit& audit)
+        : hunks_(hunks), outline_(outline), outPlan_(std::move(outPlan)), audit_(audit) {}
+
+    ToolSpec spec() const override {
+        return {"submit_plan",
+                "Submit the final progressive plan: an ordered list of phases, each with a "
+                "title, a one-paragraph rationale, and the outline item_ids it carries. Every "
+                "outline item must appear in exactly one phase. Validation errors come back as "
+                "the tool result — fix and resubmit.",
+                R"({"type":"object","properties":{"phases":{"type":"array","items":{)"
+                R"("type":"object","properties":{"title":{"type":"string"},)"
+                R"("rationale":{"type":"string"},)"
+                R"("item_ids":{"type":"array","items":{"type":"string"}}},)"
+                R"("required":["title","rationale","item_ids"]}}},"required":["phases"]})"};
+    }
+
+    std::string invoke(const std::string& argumentsJson) override {
+        struct RawPhase {
+            std::string title;
+            std::string rationale;
+            std::vector<std::string> itemIds;
+        };
+        std::vector<RawPhase> raw;
+        try {
+            json args = json::parse(argumentsJson);
+            for (const auto& p : args.at("phases")) {
+                raw.push_back({p.at("title").get<std::string>(), p.at("rationale").get<std::string>(),
+                                p.at("item_ids").get<std::vector<std::string>>()});
+            }
+        } catch (const json::exception& e) {
+            return json{{"ok", false},
+                        {"errors", json::array({std::string("invalid submit_plan arguments: ") + e.what()})}}
+                .dump();
+        }
+
+        std::unordered_map<std::string, const OutlineItem*> byId;
+        for (const auto& item : outline_.items) byId[item.id] = &item;
+
+        Plan plan;
+        std::vector<std::string> errors;
+        for (const auto& p : raw) {
+            Phase phase{p.title, p.rationale, {}};
+            for (const auto& itemId : p.itemIds) {
+                auto it = byId.find(itemId);
+                if (it == byId.end()) {
+                    errors.push_back("phase '" + p.title + "' references unknown outline item_id: " + itemId);
+                    continue;
+                }
+                for (const auto& hunkId : it->second->hunkIds) phase.hunkIds.push_back(hunkId);
+            }
+            plan.phases.push_back(std::move(phase));
+        }
+        if (!errors.empty()) {
+            return json{{"ok", false}, {"errors", errors}}.dump();
+        }
+
+        std::vector<std::string> validationErrors = validatePlan(hunks_, plan);
+        if (!validationErrors.empty()) {
+            return json{{"ok", false}, {"errors", validationErrors}}.dump();
+        }
+
+        *outPlan_ = std::move(plan);
+        audit_.writePlan(renderPlanMarkdown(*outPlan_));
+        return json{{"ok", true}}.dump();
+    }
+
+private:
+    const std::vector<Hunk>& hunks_;
+    const Outline& outline_;
+    std::shared_ptr<Plan> outPlan_;
+    Audit& audit_;
 };
 
 } // namespace
@@ -229,6 +329,22 @@ std::vector<std::unique_ptr<Tool>> buildPlannerTools(const std::vector<Hunk>& hu
     tools.push_back(std::make_unique<ReadFileTool>(repo, range));
     tools.push_back(std::make_unique<ReadCommitMessagesTool>(repo, range));
     tools.push_back(std::make_unique<SubmitPlanTool>(hunks, std::move(outPlan)));
+    return tools;
+}
+
+std::vector<std::unique_ptr<Tool>> buildOutlineTools(Outline& outline, const Hunk& hunk, const Repository& repo,
+                                                      const Repository::Range& range) {
+    std::vector<std::unique_ptr<Tool>> tools;
+    tools.push_back(std::make_unique<ClassifyHunkTool>(outline, hunk));
+    tools.push_back(std::make_unique<ReadFileTool>(repo, range));
+    tools.push_back(std::make_unique<ReadCommitMessagesTool>(repo, range));
+    return tools;
+}
+
+std::vector<std::unique_ptr<Tool>> buildGroupingTools(const std::vector<Hunk>& hunks, const Outline& outline,
+                                                       std::shared_ptr<Plan> outPlan, Audit& audit) {
+    std::vector<std::unique_ptr<Tool>> tools;
+    tools.push_back(std::make_unique<SubmitOutlinePlanTool>(hunks, outline, std::move(outPlan), audit));
     return tools;
 }
 

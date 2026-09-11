@@ -24,7 +24,8 @@ Args parseArgs(int argc, char** argv) {
     Args args;
     for (int i = 1; i < argc; ++i) {
         std::string arg = argv[i];
-        bool needsValue = arg == "--branch-name" || arg == "--provider" || arg == "--model" || arg == "--host";
+        bool needsValue = arg == "--branch-name" || arg == "--provider" || arg == "--model" || arg == "--host" ||
+                          arg == "--audit-dir";
         if (needsValue && i + 1 >= argc) return invalid;
 
         if (arg == "--branch-name") {
@@ -35,6 +36,8 @@ Args parseArgs(int argc, char** argv) {
             args.model = argv[++i];
         } else if (arg == "--host") {
             args.ollamaHost = argv[++i];
+        } else if (arg == "--audit-dir") {
+            args.auditDir = argv[++i];
         } else if (arg == "--dry-run") {
             args.dryRun = true;
         } else if (!arg.empty() && arg[0] == '-') {
