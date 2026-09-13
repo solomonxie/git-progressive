@@ -9,6 +9,7 @@
 #include "llm/ollama.hpp"
 #include "llm/openai.hpp"
 #include "planner/planner.hpp"
+#include "visualize/visualize.hpp"
 
 #include <memory>
 
@@ -21,7 +22,8 @@ int main(int argc, char** argv) {
     Args args = parseArgs(argc, argv);
     if (!args.valid) {
         std::cerr << "usage: git-progressive <branch-or-range> [--branch-name NAME] "
-                     "[--provider ollama|openai|claude] [--model NAME] [--host URL] [--audit-dir DIR] [--dry-run]\n";
+                     "[--provider ollama|openai|claude] [--model NAME] [--host URL] [--audit-dir DIR] [--dry-run] "
+                     "[--visualize]\n";
         return 1;
     }
 
@@ -67,6 +69,12 @@ int main(int argc, char** argv) {
         for (size_t i = 0; i < plan.phases.size(); ++i) {
             const auto& phase = plan.phases[i];
             std::cerr << "  " << (i + 1) << ". " << phase.title << " (" << phase.hunkIds.size() << " hunks)\n";
+        }
+
+        if (args.visualize) {
+            std::string vizPath = audit.paths().dir + "/progressive-view.html";
+            writeVisualization(plan, hunks, vizPath);
+            std::cerr << "git-progressive: visualization written to " << vizPath << "\n";
         }
 
         if (args.dryRun) {

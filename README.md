@@ -95,7 +95,13 @@ snapshot as the run progresses; `agent.log` records every model
 response and tool call/result — `tail -f` it to watch the agent reason
 live.
 
-## Backlog
+## Visualize
 
-Visualization of progressive phases (step-by-step viewer) beyond plain
-git commits — see design doc backlog.
+`--visualize` writes a self-contained `progressive-view.html` to the
+audit dir: a clickable list of phases with each phase's rationale and
+colorized diff, no server or build step needed to view it.
+
+```
+./build/git-progressive master --dry-run --visualize
+open /tmp/git-progressive/progressive-view.html
+```

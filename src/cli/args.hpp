@@ -18,6 +18,9 @@ struct Args {
     std::string model;
     std::string ollamaHost = "http://localhost:11434";
     bool dryRun = false;
+    // Writes a self-contained step-by-step diff viewer (progressive-view.html,
+    // in the audit dir) alongside whatever else the run does.
+    bool visualize = false;
     // Directory for the outline/plan/log audit files, reused (and
     // truncated) across runs. Empty means the default (/tmp/git-progressive).
     std::string auditDir;
