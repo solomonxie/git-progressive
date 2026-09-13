@@ -14,9 +14,13 @@ else builds on this existing and compiling.
 Everything downstream needs real commit ranges and diffs. Shell out to the
 `git` binary (avoid a libgit2 dependency for v1) behind a small wrapper.
 
-- [x] T2.1 Resolve input (branch name, or explicit `A..B` range) to a base commit + head commit — see `src/git/` — depends: T1.2
-- [x] T2.2 Fetch unified diff for the resolved range (`git diff <base> <head>`) and per-commit metadata — see `src/git/` — depends: T2.1
-- [x] T2.3 Create new branch rooted at the range's base commit — see `src/git/` — depends: T2.1
+- [x] T2.1 Resolve input (branch name, or explicit `A..B` range) to a base
+      commit + head commit — pointing at the default branch resolves to
+      git's empty-tree object as base instead of a root/merge-base commit
+      (whole-codebase mode, no history walk) — see `src/git/` — depends: T1.2
+- [x] T2.2 Fetch unified diff for the resolved range (`git diff <base> <head>`) — see `src/git/` — depends: T2.1
+- [x] T2.3 Create new branch rooted at the range's base commit, or (when
+      base is the empty-tree object) an orphan branch with an empty index — see `src/git/` — depends: T2.1
 
 ## Phase 3: Diff decomposition
 Turn raw unified diff text into structured, addressable hunks (stable IDs,
@@ -56,8 +60,11 @@ Depends on real hunks (Phase 3) and the agent runtime (Phase 5).
 - [x] T6.1 System prompt: onion-layer grouping/ordering instructions,
       output contract (`submit_plan` schema: ordered `{title, rationale,
       hunk_ids[]}` phases) — see `src/planner/` — depends: none
-- [x] T6.2 Read-side tools: `list_hunks`, `read_hunk`, `read_file`,
-      `read_commit_messages` — see `src/planner/tools.cpp` — depends: T3.1, T5.1
+- [x] T6.2 Read-side tools: `list_hunks`, `read_hunk`, `read_file` — see
+      `src/planner/tools.cpp` — depends: T3.1, T5.1. (`read_commit_messages`
+      was tried and later removed — see design doc: classifying from real
+      commit history made results *less* reliable, not more, since real
+      history is often squashed/rebased/noisy relative to the final diff.)
 - [x] T6.3 `submit_plan` tool: validates every hunk assigned exactly once
       and phase order respects hunk dependencies (T3.2); returns
       validation errors as the tool result for the model to self-correct — see `src/planner/tools.cpp` — depends: T3.2, T5.1
@@ -88,7 +95,8 @@ a dependency-order error, then a valid plan.
 - [x] T6b.2 Outline-builder: iterate hunks in original diff order; per
       hunk, prompt with (current outline text, hunk diff) → append a
       pointer to a matched item or create a new one; reuses T6.2's
-      read_file/read_commit_messages tools for extra context — see `src/planner/tools.cpp` (`ClassifyHunkTool`), `src/planner/planner.cpp` (`buildOutline`) — depends: T6b.1, T6.2
+      read_file tool for extra context, judged purely from hunk/file
+      content, no commit history — see `src/planner/tools.cpp` (`ClassifyHunkTool`), `src/planner/planner.cpp` (`buildOutline`) — depends: T6b.1, T6.2
 - [x] T6b.3 Grouping pass: outline.md is re-read back off disk (not the
       in-memory Outline) before this pass starts, so the file is the
       real hand-off contract between passes; ask the model to group/

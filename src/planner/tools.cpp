@@ -101,35 +101,6 @@ private:
     Repository::Range range_;
 };
 
-class ReadCommitMessagesTool : public Tool {
-public:
-    ReadCommitMessagesTool(const Repository& repo, Repository::Range range)
-        : repo_(repo), range_(std::move(range)) {}
-
-    ToolSpec spec() const override {
-        return {"read_commit_messages",
-                "List the original commits in the range with hash, subject, and body — "
-                "useful context for why a change was made.",
-                R"({"type":"object","properties":{}})"};
-    }
-
-    std::string invoke(const std::string&) override {
-        try {
-            json out = json::array();
-            for (const auto& commit : repo_.commitMessages(range_)) {
-                out.push_back({{"hash", commit.hash}, {"subject", commit.subject}, {"body", commit.body}});
-            }
-            return out.dump();
-        } catch (const std::exception& e) {
-            return json{{"ok", false}, {"error", e.what()}}.dump();
-        }
-    }
-
-private:
-    const Repository& repo_;
-    Repository::Range range_;
-};
-
 class SubmitPlanTool : public Tool {
 public:
     SubmitPlanTool(const std::vector<Hunk>& hunks, std::shared_ptr<Plan> outPlan)
@@ -327,7 +298,6 @@ std::vector<std::unique_ptr<Tool>> buildPlannerTools(const std::vector<Hunk>& hu
     tools.push_back(std::make_unique<ListHunksTool>(hunks));
     tools.push_back(std::make_unique<ReadHunkTool>(hunks));
     tools.push_back(std::make_unique<ReadFileTool>(repo, range));
-    tools.push_back(std::make_unique<ReadCommitMessagesTool>(repo, range));
     tools.push_back(std::make_unique<SubmitPlanTool>(hunks, std::move(outPlan)));
     return tools;
 }
@@ -337,7 +307,6 @@ std::vector<std::unique_ptr<Tool>> buildOutlineTools(Outline& outline, const Hun
     std::vector<std::unique_ptr<Tool>> tools;
     tools.push_back(std::make_unique<ClassifyHunkTool>(outline, hunk));
     tools.push_back(std::make_unique<ReadFileTool>(repo, range));
-    tools.push_back(std::make_unique<ReadCommitMessagesTool>(repo, range));
     return tools;
 }
 

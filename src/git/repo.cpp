@@ -6,7 +6,6 @@
 #include <array>
 #include <cstdio>
 #include <cstdlib>
-#include <sstream>
 #include <stdexcept>
 #include <vector>
 
@@ -128,11 +127,11 @@ Repository::Range Repository::resolveRange(const std::string& input) const {
 
     std::string base;
     if (defHead == head) {
-        // Whole-repo walkthrough (e.g. input == "master"): base is the
-        // repo's root commit, so phase 1 is the skeleton.
-        base = trim(runGit("rev-list --max-parents=0 " + shellQuote(input)));
-        auto nl = base.find('\n');
-        if (nl != std::string::npos) base = base.substr(0, nl); // multiple roots: first one
+        // Whole-codebase mode (e.g. input == "master"): base is git's
+        // empty-tree object, not a resolved root commit — no history
+        // walk, phase 1 is just whatever the current skeleton looks
+        // like.
+        base = kEmptyTreeHash;
     } else {
         base = trim(runGit("merge-base " + shellQuote(defBranch) + " " + shellQuote(input)));
     }
@@ -143,31 +142,15 @@ std::string Repository::diff(const Range& range) const {
     return runGit("diff " + shellQuote(range.base) + " " + shellQuote(range.head));
 }
 
-std::vector<CommitInfo> Repository::commitMessages(const Range& range) const {
-    // \x1f/\x1e (unit/record separators) split fields/commits safely,
-    // since commit messages can contain almost anything else.
-    std::string output =
-        runGit("log --pretty=format:%H%x1f%s%x1f%b%x1e " + shellQuote(range.base + ".." + range.head));
-
-    std::vector<CommitInfo> commits;
-    std::istringstream stream(output);
-    std::string record;
-    while (std::getline(stream, record, '\x1e')) {
-        if (!record.empty() && record.front() == '\n') record.erase(0, 1);
-        if (record.empty()) continue;
-        size_t f1 = record.find('\x1f');
-        size_t f2 = record.find('\x1f', f1 == std::string::npos ? f1 : f1 + 1);
-        if (f1 == std::string::npos || f2 == std::string::npos) continue;
-        CommitInfo info;
-        info.hash = record.substr(0, f1);
-        info.subject = record.substr(f1 + 1, f2 - f1 - 1);
-        info.body = trim(record.substr(f2 + 1));
-        commits.push_back(std::move(info));
-    }
-    return commits;
-}
-
 void Repository::createBranch(const std::string& name, const std::string& base) const {
+    if (base == kEmptyTreeHash) {
+        // Whole-codebase mode: there's no real commit to root the
+        // branch on, so start one with no history at all and empty its
+        // index — every phase's hunks are "new file" adds from here.
+        runGitChecked("checkout --orphan " + shellQuote(name));
+        runGitChecked("rm -r --cached -q .");
+        return;
+    }
     runGitChecked("checkout -b " + shellQuote(name) + " " + shellQuote(base));
 }
 

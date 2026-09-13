@@ -25,8 +25,8 @@ std::vector<std::unique_ptr<Tool>> buildPlannerTools(const std::vector<Hunk>& hu
                                                       std::shared_ptr<Plan> outPlan);
 
 // Outline pass tools (T6b.2): classify_hunk (mutates `outline` in place)
-// plus read_file/read_commit_messages for extra context. Rebuilt fresh
-// for each hunk since `hunk` is the one currently being classified.
+// plus read_file for extra context beyond the hunk's own diff. Rebuilt
+// fresh for each hunk since `hunk` is the one currently being classified.
 std::vector<std::unique_ptr<Tool>> buildOutlineTools(Outline& outline, const Hunk& hunk, const Repository& repo,
                                                       const Repository::Range& range);
 
