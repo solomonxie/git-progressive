@@ -64,8 +64,11 @@ Depends on real hunks (Phase 3) and the agent runtime (Phase 5).
 - [x] T6.4 Wire the planner as an `AgentLoop` instance (system prompt +
       tools from T6.1-T6.3), drive to a valid submitted plan or
       iteration cap — see `src/planner/planner.cpp` — depends: T5.2, T6.1, T6.2, T6.3
-- [ ] T6.5 Large-diff handling: chunked/summarized `list_hunks` output
-      when hunk count exceeds context budget — see `src/planner/` — depends: T6.2 — superseded by Phase 6b
+- [x] T6.5 Large-diff handling: chunked/summarized `list_hunks` output
+      when hunk count exceeds context budget — depends: T6.2 —
+      superseded by Phase 6b's outline-then-plan pipeline (bounded
+      per-call context regardless of diff size), not implemented as
+      originally scoped
 
 ## Phase 6b: Outline-then-plan pipeline (v2, addresses T6.5)
 Two bounded LLM passes over a shared outline document, replacing the
