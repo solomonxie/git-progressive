@@ -123,14 +123,19 @@ Wire the phases above into the actual command a user runs.
 - [x] T8.3 `--dry-run` mode: print the planned phases without creating commits — see `src/cli/` — depends: T6.4, T8.1
 
 ## Phase 9: Testing
-- [ ] T9.1 Unit tests: diff parser, hunk dependency detection — see `tests/` — depends: T3.1, T3.2
-- [ ] T9.2 Integration test with a mocked provider driving the agent loop
-      (scripted tool calls, fixed final plan) — see `tests/` — depends: T5.2, T7.2
-- Verified manually instead (no `tests/` yet): ran the built binary
-  end-to-end against this repo's own history with `qwen3:8b`, both
-  `--dry-run` and real commit creation; confirmed the new branch's
-  cumulative diff against its base is byte-identical to the original
-  range's diff.
+- [x] T9.1 Unit tests: diff parser, hunk dependency detection — see
+      `tests/diff_parser_test.cpp` (plus `validate_test.cpp`,
+      `outline_test.cpp` for T6.3/T6b.1's pure logic) — depends: T3.1, T3.2
+- [x] T9.2 Integration test with a mocked provider driving the agent loop
+      (scripted tool calls, fixed final plan) — see `tests/agent_loop_test.cpp` — depends: T5.2, T7.2
+- Framework: doctest via CMake FetchContent, `git-progressive-core`
+  static library shared between the real binary and
+  `git-progressive-tests`; run via `./build/tests/git-progressive-tests`
+  or `ctest` in `build/`.
+- Also verified manually: ran the built binary end-to-end against this
+  repo's own history with `qwen3:8b`, both `--dry-run` and real commit
+  creation; confirmed the new branch's cumulative diff against its base
+  is byte-identical to the original range's diff.
 
 ## Backlog
 - [ ] B1 Visualize progressive phases (step-by-step diff viewer) — depends: T8.2

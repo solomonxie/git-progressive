@@ -15,8 +15,9 @@ FetchContent_Declare(httplib
 )
 FetchContent_MakeAvailable(json httplib)
 
-add_executable(git-progressive
-    src/main.cpp
+# Everything except main.cpp, so tests/ can link the same code without a
+# second definition of main().
+add_library(git-progressive-core
     src/cli/args.cpp
     src/git/repo.cpp
     src/diff/parser.cpp
@@ -31,6 +32,11 @@ add_executable(git-progressive
     src/planner/planner.cpp
     src/commit/builder.cpp
 )
+target_include_directories(git-progressive-core PUBLIC src)
+target_link_libraries(git-progressive-core PUBLIC nlohmann_json::nlohmann_json httplib::httplib)
 
-target_include_directories(git-progressive PRIVATE src)
-target_link_libraries(git-progressive PRIVATE nlohmann_json::nlohmann_json httplib::httplib)
+add_executable(git-progressive src/main.cpp)
+target_link_libraries(git-progressive PRIVATE git-progressive-core)
+
+enable_testing()
+add_subdirectory(tests)

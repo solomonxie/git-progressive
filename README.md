@@ -47,10 +47,22 @@ cmake --build build
 ```
 
 C++17, CMake. No system-wide installs — dependencies (cpp-httplib,
-nlohmann/json) are fetched into `build/` via CMake FetchContent.
+nlohmann/json, doctest for tests) are fetched into `build/` via CMake
+FetchContent.
 
 Or via the `Makefile` wrapper: `make build`, `make dry-run RANGE=master`,
 `make run RANGE=master`, `make clean`.
+
+## Test
+
+```
+cmake --build build
+ctest --test-dir build
+```
+
+Unit tests (diff parser, hunk dependencies, plan validation, outline
+round-trip) plus an agent-loop integration test against a scripted
+mocked `Provider` — no real LLM calls.
 
 ## Run
 
