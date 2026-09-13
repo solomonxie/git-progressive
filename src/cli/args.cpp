@@ -40,6 +40,8 @@ Args parseArgs(int argc, char** argv) {
             args.auditDir = argv[++i];
         } else if (arg == "--dry-run") {
             args.dryRun = true;
+        } else if (arg == "--visualize") {
+            args.visualize = true;
         } else if (!arg.empty() && arg[0] == '-') {
             return invalid; // unknown flag
         } else if (args.range.empty()) {

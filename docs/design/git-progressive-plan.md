@@ -138,4 +138,8 @@ Wire the phases above into the actual command a user runs.
   is byte-identical to the original range's diff.
 
 ## Backlog
-- [ ] B1 Visualize progressive phases (step-by-step diff viewer) — depends: T8.2
+- [x] B1 Visualize progressive phases (step-by-step diff viewer): `--visualize`
+      writes a self-contained `progressive-view.html` (sidebar of phases,
+      colorized diff per phase) to the audit dir — reuses the commit
+      builder's patch synthesis (`src/commit/patch.hpp`, extracted so
+      both consumers share it) — see `src/visualize/` — depends: T8.2

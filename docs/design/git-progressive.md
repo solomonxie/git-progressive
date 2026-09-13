@@ -148,7 +148,10 @@ outline so it has complete history to match against.
 - `planner` — the progressive-planning agent: system prompt + its tool
   set (list/read hunks, read file, read commit messages, submit plan
   with validation).
-- `commit` — applies a validated plan's phases as real commits.
+- `commit` — synthesizes per-phase patches (`patch.hpp`) and applies a
+  validated plan's phases as real commits.
+- `visualize` — renders the plan as a self-contained step-by-step HTML
+  diff viewer (`--visualize`), reusing `commit`'s patch synthesis.
 
 ## Risks / open questions
 

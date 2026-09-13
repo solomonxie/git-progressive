@@ -30,7 +30,9 @@ add_library(git-progressive-core
     src/planner/validate.cpp
     src/planner/tools.cpp
     src/planner/planner.cpp
+    src/commit/patch.cpp
     src/commit/builder.cpp
+    src/visualize/visualize.cpp
 )
 target_include_directories(git-progressive-core PUBLIC src)
 target_link_libraries(git-progressive-core PUBLIC nlohmann_json::nlohmann_json httplib::httplib)

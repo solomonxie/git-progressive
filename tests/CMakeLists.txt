@@ -12,6 +12,7 @@ add_executable(git-progressive-tests
     validate_test.cpp
     outline_test.cpp
     agent_loop_test.cpp
+    visualize_test.cpp
 )
 target_link_libraries(git-progressive-tests PRIVATE git-progressive-core doctest::doctest)
 
