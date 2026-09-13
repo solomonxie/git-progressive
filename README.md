@@ -8,14 +8,18 @@ sequence of commits — core change first, then side changes, then
 features layered on, like onion layers — so a reviewer can read phase by
 phase instead of facing one flat wall of diff.
 
-Point it at `master` and it works the same way for onboarding: phase 1 is
-the repo skeleton (entry point, configs, build files, API interfaces),
-later phases layer in implementation, logging, architecture.
+Point it at `master` and it works the same way for onboarding: diffed
+against git's empty tree (no commit history read at all — purely the
+current code), phase 1 is the repo skeleton (entry point, configs, build
+files, API interfaces), later phases layer in implementation, logging,
+architecture.
 
 The tool never lets the LLM write or rewrite code — it only decides how to
 group and order the *real* hunks from `git diff`, then applies them as
-real commits on a new branch (rooted at the range's earliest commit). Code
-correctness stays entirely in git's hands.
+real commits on a new branch (rooted at the range's earliest commit, or
+an orphan branch in whole-codebase mode). Code correctness stays entirely
+in git's hands, and classification is judged purely from hunk/file
+content — no commit messages or history are read.
 
 Progressive commits are slices, not a full re-partition of the diff — a
 phase can carry part of a file's change and leave the rest for later,

@@ -22,10 +22,13 @@ LLM to restructure the change for reading, not to write or judge it.
 - Support both OpenAI and Claude as the LLM backend (user-supplied API key).
   Also supports local Ollama models (e.g. qwen3) — no API key, runs fully
   offline. Ollama is the default; all three are implemented.
-- Work on a whole-repo range too (e.g. `master`): first commit = skeleton
-  (entry point, configs, build files, API interfaces), later commits layer
-  in implementation, logging, architecture changes — same progressive idea
-  applied to "learn this repo fast."
+- Work on the whole current codebase too (e.g. pointing at `master`):
+  diffed against git's empty-tree object, not a resolved root commit — no
+  commit history is read at all, purely "what does the latest code look
+  like." First commit = skeleton (entry point, configs, build files, API
+  interfaces), later commits layer in implementation, logging,
+  architecture changes — same progressive idea applied to "learn this
+  repo fast."
 - CLI-first (`git progressive ...`, git-subcommand style).
 
 ## Non-goals (for now)
@@ -68,19 +71,17 @@ of LLM mistakes to "bad ordering," never "corrupted code."
 
 - **Single-shot prompt**: hunk summaries in one prompt → JSON plan out.
   Cheap, one request. But the model can only reason from hunk text/
-  summaries — no way to pull in surrounding file context, related
-  symbols, or original commit messages when judging "core vs side
-  effect" — and an invalid plan needs a separate retry driver bolted on
-  from outside the model's own reasoning.
+  summaries — no way to pull in surrounding file context when judging
+  "core vs side effect" — and an invalid plan needs a separate retry
+  driver bolted on from outside the model's own reasoning.
 - **Tool-calling agent loop** (chosen): the model drives a loop with
   tools — enumerate hunks, read a hunk's full diff, read surrounding
-  file content, read original commit messages, and finally `submit_plan`.
-  `submit_plan` runs local validation (full hunk coverage, dependency
-  order) and returns errors as the tool result, so the model self-
-  corrects inside the same loop rather than an external retry harness.
-  More requests/cost, but this is what "LLM agents" in the original ask
-  means: an agent that explores before committing to an answer, not one
-  blind guess.
+  file content, and finally `submit_plan`. `submit_plan` runs local
+  validation (full hunk coverage, dependency order) and returns errors
+  as the tool result, so the model self-corrects inside the same loop
+  rather than an external retry harness. More requests/cost, but this is
+  what "LLM agents" in the original ask means: an agent that explores
+  before committing to an answer, not one blind guess.
 
 ## Planner: two-pass outline-then-plan (chosen)
 
@@ -89,14 +90,18 @@ blows up on large diffs, and it's one big free-form decision the model
 has to get right all at once. Instead, the planner runs two bounded
 passes over a shared **outline** document:
 
-1. **Outline pass**: iterate hunks in original commit order. For each
+1. **Outline pass**: iterate hunks in original diff order. For each
    hunk, prompt the model with (current outline text, this hunk's diff)
    and ask it to either append a pointer (`file`, `hunk_id`) to a
    matching existing outline item, or create a new one — hunks come
    from one flattened range diff, not per-original-commit, so there's
-   no commit id to track per hunk; `read_commit_messages` still gives
-   the model original-commit context on demand. Output: a
-   table-of-contents-style markdown outline — each item a category
+   no commit id to track per hunk. Classification is judged purely from
+   the hunk's own diff (plus `read_file` for extra context) — no commit
+   history is read at all, by design: real repos' commit messages are
+   often noisy, missing, or don't match the final diff (squashes,
+   rebases, "wip" commits), so leaning on them would make classification
+   *less* reliable, not more. Output: a table-of-contents-style markdown
+   outline — each item a category
    ("skeleton building", "feature: X", "infra: Y", ...) with pointers to
    every hunk that belongs to it. Each pointer line is self-describing —
    `hunk_id — file:line-range` — so the file alone tells you what it
@@ -124,9 +129,9 @@ the "diff size vs LLM context" risk below) and narrows non-determinism to
 two decision points (per-hunk classification, item grouping) — the final
 hunk→phase mapping is always a deterministic expansion of the outline
 and plan. Supersedes the single-session tool-calling loop above for the
-*final grouping* decision; its read-side tools (`read_hunk`, `read_file`,
-`read_commit_messages`) stay reusable — the outline pass can call them
-too when a hunk's classification needs more context than its diff alone.
+*final grouping* decision; its read-side tools (`read_hunk`, `read_file`)
+stay reusable — the outline pass can call them too when a hunk's
+classification needs more context than its diff alone.
 
 **Outline drift risk**: classification happens one hunk at a time, so
 the model can conflate two distinct concerns into one item, or split one
@@ -138,6 +143,10 @@ outline so it has complete history to match against.
 ## Architecture
 
 - `git` — resolves ranges, diffs, branch creation (shells out to `git`).
+  Whole-codebase mode diffs against git's empty-tree object
+  (`kEmptyTreeHash`) instead of a resolved root commit, and creates an
+  orphan branch (empty index, no parent) to build the progressive
+  history onto — no commit-log reads anywhere in this path.
 - `diff` — parses unified diff into hunks, detects same-file hunk
   dependencies.
 - `llm` — provider clients (Ollama, OpenAI, Claude)
@@ -146,8 +155,8 @@ outline so it has complete history to match against.
   tool calls, append results, repeat until a terminal call or iteration
   cap. Not planner-specific, so any future agent can reuse it.
 - `planner` — the progressive-planning agent: system prompt + its tool
-  set (list/read hunks, read file, read commit messages, submit plan
-  with validation).
+  set (list/read hunks, read file, submit plan with validation). Judges
+  everything from hunk/file content only, never commit history.
 - `commit` — synthesizes per-phase patches (`patch.hpp`) and applies a
   validated plan's phases as real commits.
 - `visualize` — renders the plan as a self-contained step-by-step HTML
